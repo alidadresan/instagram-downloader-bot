@@ -1,4 +1,5 @@
 import os
+import json
 import asyncio
 from dotenv import load_dotenv
 
@@ -85,6 +86,27 @@ async def button_handler(
         await download_audio(query, url)
 
 
+async def get_video_dimensions(path):
+    try:
+        process = await asyncio.create_subprocess_exec(
+            "ffprobe",
+            "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=width,height",
+            "-of", "json",
+            path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await process.communicate()
+        data = json.loads(stdout)
+        stream = data["streams"][0]
+        return stream["width"], stream["height"]
+    except Exception as e:
+        print("FFPROBE ERROR:", repr(e), flush=True)
+        return None, None
+
+
 async def download_video(query, url):
     filename = None
 
@@ -123,10 +145,15 @@ async def download_video(query, url):
             "در حال ارسال..."
         )
 
+        width, height = await get_video_dimensions(filename)
+
         with open(filename, "rb") as video:
             await query.message.reply_video(
                 video=video,
-                caption="🎬 ویدئو با موفقیت دانلود شد."
+                caption="🎬 ویدئو با موفقیت دانلود شد.",
+                width=width,
+                height=height,
+                supports_streaming=True,
             )
 
         print("VIDEO SENT", flush=True)
