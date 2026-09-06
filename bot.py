@@ -61,6 +61,8 @@ def download_audio(url):
 
         "socket_timeout": 30,
 
+        "ffmpeg_location": "/usr/bin/ffmpeg",
+
 
         "postprocessors": [
 
