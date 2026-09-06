@@ -133,3 +133,71 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "❌ لینک اینستاگرام ارسال کنید"
         )
         return
+
+    file_path = None
+
+    try:
+        await update.message.reply_text(
+            "⏳ در حال دانلود..."
+        )
+
+        mode = context.user_data.get("mode", "video")
+
+        if mode == "audio":
+            file_path = download_audio(text)
+            with open(file_path, "rb") as f:
+                await update.message.reply_audio(
+                    audio=f,
+                    caption="🎵 آماده شد"
+                )
+        else:
+            file_path = download_video(text)
+            with open(file_path, "rb") as f:
+                await update.message.reply_video(
+                    video=f,
+                    caption="🎬 آماده شد"
+                )
+
+        await update.message.reply_text(
+            "✅ انجام شد"
+        )
+
+    except Exception as e:
+        await update.message.reply_text(
+            f"❌ خطا:\n{e}"
+        )
+
+    finally:
+        if file_path and os.path.exists(file_path):
+            os.remove(file_path)
+
+
+def main():
+    app = (
+        Application.builder()
+        .token(TOKEN)
+        .connect_timeout(30)
+        .read_timeout(60)
+        .write_timeout(60)
+        .pool_timeout(60)
+        .build()
+    )
+
+    app.add_handler(
+        CommandHandler("start", start)
+    )
+
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            message_handler
+        )
+    )
+
+    print("Bot started")
+
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
