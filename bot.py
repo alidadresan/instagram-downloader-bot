@@ -1,290 +1,258 @@
 import os
-import json
-import asyncio
-from dotenv import load_dotenv
+import uuid
+import glob
+import yt_dlp
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
-    CallbackQueryHandler,
-    filters,
     ContextTypes,
+    filters
 )
 
-import yt_dlp
-
+from dotenv import load_dotenv
 
 load_dotenv()
 
 TOKEN = os.getenv("BOT_TOKEN")
 
 
+keyboard = [
+    ["🎬 دانلود ویدئو"],
+    ["🎵 استخراج موسیقی"]
+]
+
+reply_markup = ReplyKeyboardMarkup(
+    keyboard,
+    resize_keyboard=True
+)
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     await update.message.reply_text(
         "سلام 👋\n\n"
-        "به ربات دانلود از اینستاگرام خوش آمدید.\n\n"
-        "لینک ویدئو، ریلز یا پست اینستاگرام را ارسال کنید."
+        "ربات دانلود اینستاگرام آماده است.\n\n"
+        "نوع دانلود را انتخاب کنید:",
+        reply_markup=reply_markup
     )
+
+
+
+def download_audio(url):
+
+    uid = uuid.uuid4().hex
+
+    filename = f"audio_{uid}"
+
+    options = {
+
+        "outtmpl": filename + ".%(ext)s",
+
+        "format": "bestaudio",
+
+        "noplaylist": True,
+
+        "quiet": True,
+
+        "retries": 2,
+
+        "socket_timeout": 30,
+
+
+        "postprocessors": [
+
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "128"
+            }
+
+        ]
+    }
+
+
+    with yt_dlp.YoutubeDL(options) as ydl:
+
+        ydl.download([url])
+
+
+    files = glob.glob(filename + ".mp3")
+
+
+    if not files:
+
+        raise Exception("فایل صوتی ساخته نشد")
+
+
+    return files[0]
+
+
+
+def download_video(url):
+
+    uid = uuid.uuid4().hex
+
+    filename = f"video_{uid}"
+
+
+    options = {
+
+        "outtmpl": filename + ".%(ext)s",
+
+        "format": "best",
+
+        "noplaylist": True,
+
+        "quiet": True,
+
+        "retries": 2,
+
+        "socket_timeout": 30
+    }
+
+
+
+    with yt_dlp.YoutubeDL(options) as ydl:
+
+        ydl.download([url])
+
+
+    files = glob.glob(filename + ".*")
+
+
+    if not files:
+
+        raise Exception("فایل ویدئو ساخته نشد")
+
+
+    return files[0]
+
 
 
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
 
-    print("MESSAGE RECEIVED:", text, flush=True)
+    text = update.message.text
+
+
+    if text == "🎵 استخراج موسیقی":
+
+        context.user_data["mode"] = "audio"
+
+        await update.message.reply_text(
+            "لینک اینستاگرام را ارسال کنید 🎵"
+        )
+
+        return
+
+
+
+    if text == "🎬 دانلود ویدئو":
+
+        context.user_data["mode"] = "video"
+
+        await update.message.reply_text(
+            "لینک اینستاگرام را ارسال کنید 🎬"
+        )
+
+        return
+
+
 
     if "instagram.com" not in text:
+
         await update.message.reply_text(
-            "❌ لطفاً یک لینک معتبر از اینستاگرام ارسال کنید."
+            "❌ لینک اینستاگرام ارسال کنید"
         )
+
         return
 
-    context.user_data["instagram_url"] = text
-
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                "🎬 دانلود ویدئو",
-                callback_data="download_video"
-            ),
-            InlineKeyboardButton(
-                "🎵 استخراج موزیک MP3",
-                callback_data="download_audio"
-            ),
-        ]
-    ]
-
-    await update.message.reply_text(
-        "لینک دریافت شد ✅\n\n"
-        "انتخاب کنید:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
 
 
-async def button_handler(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-    query = update.callback_query
+    file_path = None
 
-    await query.answer()
-
-    url = context.user_data.get("instagram_url")
-
-    if not url:
-        await query.edit_message_text(
-            "❌ لینک پیدا نشد.\n"
-            "لطفاً دوباره لینک اینستاگرام را ارسال کنید."
-        )
-        return
-
-    if query.data == "download_video":
-        await download_video(query, url)
-
-    elif query.data == "download_audio":
-        await download_audio(query, url)
-
-
-async def get_video_dimensions(path):
-    try:
-        process = await asyncio.create_subprocess_exec(
-            "ffprobe",
-            "-v", "error",
-            "-select_streams", "v:0",
-            "-show_entries", "stream=width,height",
-            "-of", "json",
-            path,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, _ = await process.communicate()
-        data = json.loads(stdout)
-        stream = data["streams"][0]
-        return stream["width"], stream["height"]
-    except Exception as e:
-        print("FFPROBE ERROR:", repr(e), flush=True)
-        return None, None
-
-
-async def download_video(query, url):
-    filename = None
 
     try:
-        await query.edit_message_text(
-            "⏳ در حال دانلود ویدئو..."
+
+        await update.message.reply_text(
+            "⏳ در حال دانلود..."
         )
 
-        loop = asyncio.get_running_loop()
 
-        def download():
-            nonlocal filename
+        mode = context.user_data.get(
+            "mode",
+            "video"
+        )
 
-            ydl_opts = {
-                "format": "best[ext=mp4]/best",
-                "outtmpl": "%(id)s.%(ext)s",
-                "noplaylist": True,
-                "quiet": False,
-            }
 
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(
-                    url,
-                    download=True
+        if mode == "audio":
+
+            file_path = download_audio(text)
+
+
+            with open(file_path, "rb") as f:
+
+                await update.message.reply_audio(
+                    audio=f,
+                    caption="🎵 آماده شد"
                 )
 
-                filename = ydl.prepare_filename(info)
 
-        await loop.run_in_executor(None, download)
+        else:
 
-        if not filename or not os.path.exists(filename):
-            raise Exception("Video file not found")
-
-        await query.edit_message_text(
-            "✅ ویدئو دانلود شد.\n"
-            "در حال ارسال..."
-        )
-
-        width, height = await get_video_dimensions(filename)
-
-        with open(filename, "rb") as video:
-            await query.message.reply_video(
-                video=video,
-                caption="🎬 ویدئو با موفقیت دانلود شد.",
-                width=width,
-                height=height,
-                supports_streaming=True,
-            )
-
-        print("VIDEO SENT", flush=True)
-
-    except Exception as e:
-        print("VIDEO ERROR:", repr(e), flush=True)
-
-        await query.edit_message_text(
-            "❌ دانلود ویدئو انجام نشد."
-        )
-
-    finally:
-        if filename and os.path.exists(filename):
-            try:
-                os.remove(filename)
-            except Exception:
-                pass
+            file_path = download_video(text)
 
 
-async def download_audio(query, url):
-    source_file = None
-    mp3_file = None
+            with open(file_path, "rb") as f:
 
-    try:
-        await query.edit_message_text(
-            "⏳ در حال استخراج موزیک..."
-        )
-
-        loop = asyncio.get_running_loop()
-
-        def download():
-            nonlocal source_file
-
-            ydl_opts = {
-                "format": "bestaudio/best",
-                "outtmpl": "%(id)s.%(ext)s",
-                "noplaylist": True,
-                "quiet": False,
-            }
-
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(
-                    url,
-                    download=True
+                await update.message.reply_video(
+                    video=f,
+                    caption="🎬 آماده شد"
                 )
 
-                source_file = ydl.prepare_filename(info)
 
-        await loop.run_in_executor(None, download)
-
-        if not source_file or not os.path.exists(source_file):
-            raise Exception("Audio file not found")
-
-        mp3_file = os.path.splitext(source_file)[0] + ".mp3"
-
-        await query.edit_message_text(
-            "🎵 صدا دریافت شد.\n"
-            "در حال تبدیل به MP3..."
+        await update.message.reply_text(
+            "✅ انجام شد"
         )
 
-        process = await asyncio.create_subprocess_exec(
-            "ffmpeg",
-            "-y",
-            "-i",
-            source_file,
-            "-vn",
-            "-codec:a",
-            "libmp3lame",
-            "-q:a",
-            "2",
-            mp3_file,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-
-        stdout, stderr = await process.communicate()
-
-        if process.returncode != 0:
-            print(
-                "FFMPEG ERROR:",
-                stderr.decode(errors="ignore"),
-                flush=True
-            )
-            raise Exception("FFmpeg conversion failed")
-
-        if not os.path.exists(mp3_file):
-            raise Exception("MP3 file not found")
-
-        await query.edit_message_text(
-            "✅ MP3 آماده شد.\n"
-            "در حال ارسال..."
-        )
-
-        with open(mp3_file, "rb") as audio:
-            await query.message.reply_audio(
-                audio=audio,
-                filename="Instagram_Audio.mp3",
-                title="Instagram Audio",
-                caption="🎵 موزیک با موفقیت استخراج شد."
-            )
-
-        print("MP3 SENT", flush=True)
 
     except Exception as e:
-        print("AUDIO ERROR:", repr(e), flush=True)
 
-        await query.edit_message_text(
-            "❌ استخراج موزیک انجام نشد."
+        await update.message.reply_text(
+            f"❌ خطا:\n{e}"
         )
 
+
     finally:
-        for file in (source_file, mp3_file):
-            if file and os.path.exists(file):
-                try:
-                    os.remove(file)
-                except Exception:
-                    pass
+
+        if file_path and os.path.exists(file_path):
+
+            os.remove(file_path)
+
 
 
 def main():
-    if not TOKEN:
-        print("ERROR: BOT_TOKEN not found in .env", flush=True)
-        return
 
-    print("TOKEN FOUND", flush=True)
+    app = (
+        Application.builder()
+        .token(TOKEN)
+        .connect_timeout(30)
+        .read_timeout(60)
+        .write_timeout(60)
+        .pool_timeout(60)
+        .build()
+    )
 
-    app = Application.builder().token(TOKEN).build()
 
     app.add_handler(
-        CommandHandler("start", start)
+        CommandHandler(
+            "start",
+            start
+        )
     )
+
 
     app.add_handler(
         MessageHandler(
@@ -293,14 +261,13 @@ def main():
         )
     )
 
-    app.add_handler(
-        CallbackQueryHandler(button_handler)
-    )
 
-    print("Bot started", flush=True)
+    print("Bot started")
 
     app.run_polling()
 
 
+
 if __name__ == "__main__":
+
     main()
