@@ -5,12 +5,10 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+RUN which ffmpeg && which ffprobe && ffmpeg -version && ffprobe -version
+
 WORKDIR /app
-
 COPY requirements.txt .
-
 RUN pip install --no-cache-dir -r requirements.txt
-
 COPY . .
-
 CMD ["python", "bot.py"]
