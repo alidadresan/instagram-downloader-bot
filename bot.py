@@ -64,7 +64,7 @@ def download_audio(url):
     src_file = downloaded_files[0]
     mp3_file = filename + ".mp3"
 
-    subprocess.run(
+    result = subprocess.run(
         [
             "ffmpeg",
             "-y",
@@ -74,9 +74,12 @@ def download_audio(url):
             "-b:a", "128k",
             mp3_file
         ],
-        check=True,
         capture_output=True
     )
+
+    if result.returncode != 0:
+        error_output = result.stderr.decode("utf-8", errors="ignore")
+        raise Exception(f"ffmpeg failed:\n{error_output[-800:]}")
 
     if os.path.exists(src_file) and src_file != mp3_file:
         os.remove(src_file)
