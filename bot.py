@@ -1,6 +1,7 @@
 import os
 import uuid
 import glob
+import subprocess
 import yt_dlp
 
 from telegram import Update, ReplyKeyboardMarkup
@@ -60,19 +61,6 @@ def download_audio(url):
         "retries": 2,
 
         "socket_timeout": 30,
-
-        "ffmpeg_location": "/usr/bin/ffmpeg",
-
-
-        "postprocessors": [
-
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-                "preferredquality": "128"
-            }
-
-        ]
     }
 
 
@@ -81,15 +69,45 @@ def download_audio(url):
         ydl.download([url])
 
 
-    files = glob.glob(filename + ".mp3")
+    downloaded_files = glob.glob(filename + ".*")
 
 
-    if not files:
+    if not downloaded_files:
+
+        raise Exception("فایل دانلود نشد")
+
+
+    src_file = downloaded_files[0]
+
+    mp3_file = filename + ".mp3"
+
+
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-i", src_file,
+            "-vn",
+            "-acodec", "libmp3lame",
+            "-b:a", "128k",
+            mp3_file
+        ],
+        check=True,
+        capture_output=True
+    )
+
+
+    if os.path.exists(src_file) and src_file != mp3_file:
+
+        os.remove(src_file)
+
+
+    if not os.path.exists(mp3_file):
 
         raise Exception("فایل صوتی ساخته نشد")
 
 
-    return files[0]
+    return mp3_file
 
 
 
@@ -199,77 +217,3 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_audio(
                     audio=f,
                     caption="🎵 آماده شد"
-                )
-
-
-        else:
-
-            file_path = download_video(text)
-
-
-            with open(file_path, "rb") as f:
-
-                await update.message.reply_video(
-                    video=f,
-                    caption="🎬 آماده شد"
-                )
-
-
-        await update.message.reply_text(
-            "✅ انجام شد"
-        )
-
-
-    except Exception as e:
-
-        await update.message.reply_text(
-            f"❌ خطا:\n{e}"
-        )
-
-
-    finally:
-
-        if file_path and os.path.exists(file_path):
-
-            os.remove(file_path)
-
-
-
-def main():
-
-    app = (
-        Application.builder()
-        .token(TOKEN)
-        .connect_timeout(30)
-        .read_timeout(60)
-        .write_timeout(60)
-        .pool_timeout(60)
-        .build()
-    )
-
-
-    app.add_handler(
-        CommandHandler(
-            "start",
-            start
-        )
-    )
-
-
-    app.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
-            message_handler
-        )
-    )
-
-
-    print("Bot started")
-
-    app.run_polling()
-
-
-
-if __name__ == "__main__":
-
-    main()
