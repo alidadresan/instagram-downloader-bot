@@ -177,6 +177,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_audio(
                     audio=f,
                     title="insta downloader",
+                    performer="@instadownloader_farsi_bot",
                     caption="🎵 آماده شد"
                 )
         else:
