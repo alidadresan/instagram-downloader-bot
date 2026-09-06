@@ -46,7 +46,7 @@ def download_audio(url):
 
     options = {
         "outtmpl": filename + ".%(ext)s",
-        "format": "bestaudio/best",
+        "format": "bestaudio/best[acodec!=none]/best",
         "noplaylist": True,
         "quiet": True,
         "retries": 2,
@@ -54,7 +54,15 @@ def download_audio(url):
     }
 
     with yt_dlp.YoutubeDL(options) as ydl:
-        ydl.download([url])
+        info = ydl.extract_info(url, download=True)
+
+    has_audio = info.get("acodec") not in (None, "none")
+
+    if not has_audio:
+        raise Exception(
+            "این ریلز فاقد صدای قابل دانلود است "
+            "(احتمالاً به‌دلیل محدودیت کپی‌رایت موزیک توسط اینستاگرام)."
+        )
 
     downloaded_files = glob.glob(filename + ".*")
 
