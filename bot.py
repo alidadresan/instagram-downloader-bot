@@ -61,6 +61,10 @@ def download_audio(url):
     if not has_audio:
         track = info.get("track")
         artist = info.get("artist")
+        artists = info.get("artists")
+        creator = info.get("creator")
+        alt_title = info.get("alt_title")
+        description = info.get("description") or ""
 
         song_info = ""
 
@@ -68,13 +72,24 @@ def download_audio(url):
             song_info = f"\n\n🎼 نام آهنگ: {track}\n🎤 خواننده: {artist}"
         elif track:
             song_info = f"\n\n🎼 نام آهنگ: {track}"
-        elif info.get("alt_title"):
-            song_info = f"\n\n🎼 {info.get('alt_title')}"
+        elif alt_title:
+            song_info = f"\n\n🎼 {alt_title}"
+
+        debug_info = (
+            f"\n\n[DEBUG]\n"
+            f"track={track}\n"
+            f"artist={artist}\n"
+            f"artists={artists}\n"
+            f"creator={creator}\n"
+            f"alt_title={alt_title}\n"
+            f"description(200)={description[:200]}"
+        )
 
         raise Exception(
             "این ریلز فاقد صدای قابل دانلود است "
             "(به‌دلیل محدودیت کپی‌رایت موزیک توسط اینستاگرام)."
             + song_info
+            + debug_info
         )
 
     downloaded_files = glob.glob(filename + ".*")
