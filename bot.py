@@ -51,7 +51,7 @@ def download_audio(url):
 
         "outtmpl": filename + ".%(ext)s",
 
-        "format": "bestaudio",
+        "format": "bestaudio/best",
 
         "noplaylist": True,
 
